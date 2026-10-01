@@ -1,4 +1,7 @@
 allowBuilds:
   esbuild: true
   unrs-resolver: true
+minimumReleaseAgeExclude:
+  - '@vinext/types@1.0.1'
+  - vinext@1.0.1
 nodeLinker: hoisted
