@@ -9,15 +9,22 @@ import * as schema from "./schema";
 const dataDirectory = path.resolve(process.env.DATA_DIR || path.join(process.cwd(), "data"));
 const databasePath = path.join(dataDirectory, "caderno-pmba.sqlite");
 
-mkdirSync(dataDirectory, { recursive: true });
+async function initializeDatabase() {
+  mkdirSync(dataDirectory, { recursive: true });
+  const client = createClient({ url: pathToFileURL(databasePath).href });
+  const database = drizzle(client, { schema });
 
-const client = createClient({ url: pathToFileURL(databasePath).href });
-const database = drizzle(client, { schema });
+  await client.execute("PRAGMA busy_timeout = 5000");
+  await client.execute("PRAGMA journal_mode = WAL");
+  await client.execute("PRAGMA foreign_keys = ON");
+  await migrate(database, { migrationsFolder: path.join(process.cwd(), "drizzle") });
 
-await client.execute("PRAGMA journal_mode = WAL");
-await client.execute("PRAGMA foreign_keys = ON");
-await migrate(database, { migrationsFolder: path.join(process.cwd(), "drizzle") });
+  return database;
+}
+
+let databasePromise: ReturnType<typeof initializeDatabase> | undefined;
 
 export function getDb() {
-  return database;
+  databasePromise ??= initializeDatabase();
+  return databasePromise;
 }

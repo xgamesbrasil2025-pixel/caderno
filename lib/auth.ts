@@ -153,7 +153,7 @@ export function adminRoleForEmail(email: string): "admin" | "user" {
 }
 
 export async function createSession(request: Request, userId: string, remember: boolean) {
-  const db = getDb();
+  const db = await getDb();
   const token = randomToken();
   const tokenHash = await hashToken(token);
   const createdAt = new Date();
@@ -179,14 +179,14 @@ export function clearSessionCookie(request: Request) {
 export async function destroyCurrentSession(request: Request) {
   const token = cookieValue(request, SESSION_COOKIE);
   if (!token) return;
-  const db = getDb();
+  const db = await getDb();
   await db.delete(userSessions).where(eq(userSessions.tokenHash, await hashToken(token)));
 }
 
 export async function getCurrentUser(request: Request): Promise<AuthUser | null> {
   const token = cookieValue(request, SESSION_COOKIE);
   if (!token) return null;
-  const db = getDb();
+  const db = await getDb();
   const tokenHash = await hashToken(token);
   const [session] = await db.select().from(userSessions).where(eq(userSessions.tokenHash, tokenHash)).limit(1);
   if (!session) return null;
@@ -245,7 +245,7 @@ export function authErrorResponse(error: unknown) {
 }
 
 export async function createAuthToken(userId: string, kind: "verify_email" | "reset_password", lifetimeMs: number) {
-  const db = getDb();
+  const db = await getDb();
   const token = randomToken();
   const timestamp = new Date();
   await db.batch([
@@ -263,7 +263,7 @@ export async function createAuthToken(userId: string, kind: "verify_email" | "re
 }
 
 export async function consumeAuthToken(token: string, kind: "verify_email" | "reset_password") {
-  const db = getDb();
+  const db = await getDb();
   const timestamp = new Date().toISOString();
   const [row] = await db.select().from(authTokens).where(and(
     eq(authTokens.tokenHash, await hashToken(token)),
@@ -275,7 +275,7 @@ export async function consumeAuthToken(token: string, kind: "verify_email" | "re
 }
 
 export async function checkRateLimit(request: Request, action: string, identity: string, maximum: number) {
-  const db = getDb();
+  const db = await getDb();
   const address = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "local";
   const keyHash = await hashToken(`${action}:${address}:${normalizeEmail(identity)}`);
   const now = new Date();
@@ -299,7 +299,7 @@ export async function checkRateLimit(request: Request, action: string, identity:
 }
 
 export async function clearExpiredAuthData() {
-  const db = getDb();
+  const db = await getDb();
   const timestamp = new Date().toISOString();
   await db.batch([
     db.delete(userSessions).where(lt(userSessions.expiresAt, timestamp)),
@@ -308,7 +308,7 @@ export async function clearExpiredAuthData() {
 }
 
 export async function claimLegacyStudyData(userId: string) {
-  const db = getDb();
+  const db = await getDb();
   await db.batch([
     db.update(topicState).set({ userId }).where(eq(topicState.userId, LEGACY_OWNER_ID)),
     db.update(summaries).set({ userId }).where(eq(summaries.userId, LEGACY_OWNER_ID)),
