@@ -74,8 +74,15 @@ export function AuthGate() {
           setMode("pending");
         }
       } else if (mode === "forgot") {
-        const result = await authRequest({ action: "forgotPassword", email: form.get("email") });
-        setMessage(String(result.message || "Peça ao administrador uma senha temporária."));
+        const result = await authRequest({
+          action: "recoverAdmin",
+          email: form.get("email"),
+          recoveryCode: form.get("recoveryCode"),
+          password: form.get("password"),
+          confirmPassword: form.get("confirmPassword"),
+        });
+        setUser(result.user as SessionUser);
+        setMessage("");
       } else if (mode === "change-password") {
         const result = await authRequest({ action: "changePassword", password: form.get("password"), confirmPassword: form.get("confirmPassword") });
         setUser(result.user as SessionUser);
@@ -114,8 +121,8 @@ export function AuthGate() {
       <div className="auth-heading">
         {activeMode !== "login" && activeMode !== "change-password" && <button className="auth-back" type="button" onClick={() => { setMode("login"); setError(""); setMessage(""); }} aria-label="Voltar"><ArrowLeft /></button>}
         <div>
-          <p>{activeMode === "register" ? "NOVA CONTA" : activeMode === "forgot" ? "RECUPERAR ACESSO" : activeMode === "change-password" ? "SENHA TEMPORÁRIA" : "BEM-VINDO"}</p>
-          <h2>{activeMode === "register" ? "Crie seu caderno" : activeMode === "forgot" ? "Esqueceu a senha?" : activeMode === "change-password" ? "Crie uma nova senha" : "Entre para continuar"}</h2>
+          <p>{activeMode === "register" ? "NOVA CONTA" : activeMode === "forgot" ? "RECUPERAR ADMINISTRADOR" : activeMode === "change-password" ? "SENHA TEMPORÁRIA" : "BEM-VINDO"}</p>
+          <h2>{activeMode === "register" ? "Crie seu caderno" : activeMode === "forgot" ? "Crie uma nova senha" : activeMode === "change-password" ? "Crie uma nova senha" : "Entre para continuar"}</h2>
         </div>
       </div>
       {activeMode === "change-password" && <div className="auth-message success"><ShieldCheck />Por segurança, troque a senha temporária antes de acessar seus estudos.</div>}
@@ -124,12 +131,13 @@ export function AuthGate() {
       <form onSubmit={submit} className="auth-form">
         {activeMode === "register" && <label><span>Nome</span><div className="auth-input"><UserRound /><input name="name" autoComplete="name" required minLength={2} placeholder="Seu nome" /></div></label>}
         {["login", "register", "forgot"].includes(activeMode) && <label><span>E-mail</span><div className="auth-input"><Mail /><input name="email" type="email" autoComplete="email" required placeholder="voce@email.com" /></div></label>}
-        {["login", "register", "change-password"].includes(activeMode) && <label><span>{activeMode === "change-password" ? "Nova senha" : "Senha"}</span><div className="auth-input"><LockKeyhole /><input name="password" type="password" autoComplete={activeMode === "login" ? "current-password" : "new-password"} required minLength={8} placeholder="Mínimo de 8 caracteres" /></div></label>}
-        {["register", "change-password"].includes(activeMode) && <label><span>Confirmar senha</span><div className="auth-input"><ShieldCheck /><input name="confirmPassword" type="password" autoComplete="new-password" required minLength={8} placeholder="Repita a senha" /></div></label>}
+        {activeMode === "forgot" && <label><span>Código de recuperação</span><div className="auth-input"><ShieldCheck /><input name="recoveryCode" type="password" autoComplete="one-time-code" required minLength={16} maxLength={256} placeholder="Código salvo no Railway" /></div></label>}
+        {["login", "register", "forgot", "change-password"].includes(activeMode) && <label><span>{["forgot", "change-password"].includes(activeMode) ? "Nova senha" : "Senha"}</span><div className="auth-input"><LockKeyhole /><input name="password" type="password" autoComplete={activeMode === "login" ? "current-password" : "new-password"} required minLength={8} placeholder="Letras e números, mínimo de 8" /></div></label>}
+        {["register", "forgot", "change-password"].includes(activeMode) && <label><span>Confirmar senha</span><div className="auth-input"><ShieldCheck /><input name="confirmPassword" type="password" autoComplete="new-password" required minLength={8} placeholder="Repita a senha" /></div></label>}
         {activeMode === "login" && <div className="auth-options"><label className="remember"><input name="remember" type="checkbox" defaultChecked /> Manter conectado</label><button type="button" className="auth-link" onClick={() => { setMode("forgot"); setError(""); setMessage(""); }}>Esqueci minha senha</button></div>}
-        <Button className="auth-submit" disabled={submitting}>{submitting ? <><LoaderCircle className="spin" /> Aguarde…</> : activeMode === "register" ? "Criar conta" : activeMode === "forgot" ? "Como recuperar" : activeMode === "change-password" ? "Salvar nova senha" : "Entrar"}</Button>
+        <Button className="auth-submit" disabled={submitting}>{submitting ? <><LoaderCircle className="spin" /> Aguarde…</> : activeMode === "register" ? "Criar conta" : activeMode === "forgot" ? "Redefinir senha do ADM" : activeMode === "change-password" ? "Salvar nova senha" : "Entrar"}</Button>
       </form>
-      {activeMode === "forgot" && <p className="auth-help">A plataforma não envia e-mails. O administrador pode criar uma senha temporária na área Administração.</p>}
+      {activeMode === "forgot" && <p className="auth-help">Use o código secreto configurado em <strong>ADMIN_RECOVERY_CODE</strong> nas Variáveis do Railway.</p>}
       {activeMode === "login" && <p className="auth-switch">Ainda não tem conta? <button type="button" onClick={() => { setMode("register"); setError(""); setMessage(""); }}>Criar conta</button></p>}
     </section>
   </main>;
