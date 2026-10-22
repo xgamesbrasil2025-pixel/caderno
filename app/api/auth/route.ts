@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { users } from "@/db/schema";
+import { userSessions, users } from "@/db/schema";
 import {
   AuthError,
   adminRoleForEmail,
@@ -14,6 +14,7 @@ import {
   getCurrentUser,
   hashPassword,
   requireSameOrigin,
+  secretsMatch,
   validateEmail,
   validateName,
   validatePassword,
@@ -155,6 +156,38 @@ export async function POST(request: Request) {
         ok: true,
         message: "Peça ao administrador para criar uma senha temporária para esta conta.",
       });
+    }
+
+    if (action === "recoverAdmin") {
+      const email = validateEmail(body.email);
+      const recoveryCode = safeText(body.recoveryCode, 256);
+      const password = validatePassword(body.password);
+      if (password !== safeText(body.confirmPassword, 128)) throw new AuthError(400, "As senhas não coincidem.");
+      await checkRateLimit(request, action, email, 5);
+
+      const configuredCode = String(process.env.ADMIN_RECOVERY_CODE || "");
+      if (configuredCode.length < 16) throw new AuthError(503, "A recuperação do administrador ainda não foi configurada.");
+      if (adminRoleForEmail(email) !== "admin" || !(await secretsMatch(recoveryCode, configuredCode))) {
+        throw new AuthError(401, "E-mail ou código de recuperação inválido.");
+      }
+
+      const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+      if (!user || user.role !== "admin") throw new AuthError(401, "E-mail ou código de recuperação inválido.");
+
+      const timestamp = new Date().toISOString();
+      await db.batch([
+        db.update(users).set({
+          passwordHash: await hashPassword(password),
+          status: "ACTIVE",
+          mustChangePassword: false,
+          updatedAt: timestamp,
+          lastAccessAt: timestamp,
+        }).where(eq(users.id, user.id)),
+        db.delete(userSessions).where(eq(userSessions.userId, user.id)),
+      ]);
+      const [updated] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
+      const cookie = await createSession(request, user.id, true);
+      return Response.json({ ok: true, user: sessionUser(updated), message: "Senha do administrador redefinida." }, { headers: { "Set-Cookie": cookie } });
     }
 
     if (action === "logout") {
