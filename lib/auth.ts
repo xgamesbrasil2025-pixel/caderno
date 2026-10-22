@@ -121,6 +121,18 @@ export async function hashToken(token: string) {
   return bytesToBase64Url(new Uint8Array(digest));
 }
 
+export async function secretsMatch(value: string, expected: string) {
+  const [valueHash, expectedHash] = await Promise.all([
+    crypto.subtle.digest("SHA-256", encoder.encode(value)),
+    crypto.subtle.digest("SHA-256", encoder.encode(expected)),
+  ]);
+  const left = new Uint8Array(valueHash);
+  const right = new Uint8Array(expectedHash);
+  let difference = value.length ^ expected.length;
+  for (let index = 0; index < left.length; index += 1) difference |= left[index] ^ right[index];
+  return difference === 0;
+}
+
 function cookieValue(request: Request, name: string) {
   const cookies = request.headers.get("cookie") || "";
   for (const part of cookies.split(";")) {
